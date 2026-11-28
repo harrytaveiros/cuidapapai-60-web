@@ -1,18 +1,26 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Pill,
   Check,
   CalendarPlus,
-  Bell,
-  HeartPulse,
-  UserSearch,
   Clock,
   ChevronRight,
   Sparkles,
+  HeartPulse,
+  Droplets,
+  Activity,
+  CheckCircle2,
 } from 'lucide-react';
+import {
+  getUser,
+  getMedications,
+  getAppointments,
+  getCareTasks,
+  logout,
+} from '../services/api';
 
-// Formatação inicial de data acolhedora e acessível (fora da renderização pura)
+// Formatação inicial de data acolhedora e acessível
 function getFormattedToday() {
   const formatted = new Intl.DateTimeFormat('pt-BR', {
     weekday: 'long',
@@ -23,87 +31,85 @@ function getFormattedToday() {
   return formatted.charAt(0).toUpperCase() + formatted.slice(1);
 }
 
+// Mapeamento dinâmico de ícones por categoria da API
+function getTaskIcon(category) {
+  switch (category) {
+    case 'blood_pressure':
+      return HeartPulse;
+    case 'hydration':
+      return Droplets;
+    case 'medication':
+      return Pill;
+    case 'appointment':
+      return CalendarPlus;
+    default:
+      return Activity;
+  }
+}
+
 export default function Home() {
+  const navigate = useNavigate();
+
+  // Tarefa 2: Estados da Home
+  const [user, setUser] = useState(null);
+  const [medications, setMedications] = useState([]);
+  const [appointments, setAppointments] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
   const [medTaken, setMedTaken] = useState(false);
   const [dateDisplay] = useState(getFormattedToday);
 
-  // Dados dos 4 cartões de Acesso Rápido
-  const quickActions = [
-    {
-      id: 'consulta',
-      title: 'Nova consulta',
-      subtitle: 'Agendar com médico',
-      icon: CalendarPlus,
-      borderColor: 'border-l-sky-500',
-      iconBg: 'bg-sky-50 text-sky-600',
-      to: '/agenda',
-    },
-    {
-      id: 'lembrete',
-      title: 'Lembrete',
-      subtitle: 'Criar novo alarme',
-      icon: Bell,
-      borderColor: 'border-l-secondary',
-      iconBg: 'bg-amber-50 text-amber-600',
-      to: '/agenda',
-    },
-    {
-      id: 'cuidado',
-      title: 'Registrar cuidado',
-      subtitle: 'Pressão, glicose e mais',
-      icon: HeartPulse,
-      borderColor: 'border-l-primary',
-      iconBg: 'bg-emerald-50 text-primary',
-      to: '/saude',
-    },
-    {
-      id: 'cuidador',
-      title: 'Buscar cuidador',
-      subtitle: 'Equipe e apoios',
-      icon: UserSearch,
-      borderColor: 'border-l-purple-500',
-      iconBg: 'bg-purple-50 text-purple-600',
-      to: '/cuidadores',
-    },
-  ];
+  // Tarefa 2 e 3: Carregamento simultâneo com Promise.all e tratamento de 401
+  useEffect(() => {
+    async function loadDashboardData() {
+      try {
+        setIsLoading(true);
+        const [userData, medicationsData, appointmentsData, tasksData] =
+          await Promise.all([
+            getUser(),
+            getMedications(),
+            getAppointments(),
+            getCareTasks(),
+          ]);
 
-  // Dados dos 3 próximos eventos da agenda
-  const upcomingEvents = [
-    {
-      id: 1,
-      day: '14',
-      month: 'MAI',
-      title: 'Consulta Cardiologista',
-      doctor: 'Dr. Roberto Silva',
-      time: '09:30',
-      location: 'Hospital Santa Lúcia',
-      type: 'Presencial',
-    },
-    {
-      id: 2,
-      day: '18',
-      month: 'MAI',
-      title: 'Sessão de Fisioterapia',
-      doctor: 'Dra. Camila Soares',
-      time: '14:00',
-      location: 'Atendimento Domiciliar',
-      type: 'Domiciliar',
-    },
-    {
-      id: 3,
-      day: '22',
-      month: 'MAI',
-      title: 'Exame de Sangue & Glicemia',
-      doctor: 'Laboratório Central',
-      time: '07:30',
-      location: 'Jejum obrigatório de 8h',
-      type: 'Exame',
-    },
-  ];
+        setUser(userData);
+        setMedications(Array.isArray(medicationsData) ? medicationsData : []);
+        setAppointments(Array.isArray(appointmentsData) ? appointmentsData : []);
+        setTasks(Array.isArray(tasksData) ? tasksData : []);
+      } catch (error) {
+        console.error('Falha ao carregar dados do dashboard:', error);
+        // Se a chamada falhar com status 401 (Não autorizado), força logout e redireciona para Login
+        if (error.status === 401 || error.message?.includes('401')) {
+          logout();
+          navigate('/', { replace: true });
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadDashboardData();
+  }, [navigate]);
+
+  // Tarefa 3: Estado de Loading com Spinner circular verde e mensagem
+  if (isLoading) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center p-8 text-center select-none">
+        <div className="w-12 h-12 border-4 border-emerald-100 border-t-[#126E51] rounded-full animate-spin mb-4 shadow-xs" />
+        <p className="text-base font-semibold text-slate-700 animate-pulse">
+          Carregando a sua rotina...
+        </p>
+      </div>
+    );
+  }
+
+  // Próximo medicamento do array
+  const nextMed = medications && medications.length > 0 ? medications[0] : null;
 
   return (
-    <div className="w-full space-y-6">
-      {/* TAREFA 1: Cabeçalho de Saudação + Linha Tricolor */}
+    <div className="w-full space-y-6 antialiased">
+      {/* TAREFA 4: Cabeçalho com Saudação "Olá, {user?.short_name}!" */}
       <section className="bg-card rounded-2xl p-5 sm:p-6 shadow-xs border border-slate-100">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div>
@@ -111,7 +117,7 @@ export default function Home() {
               {dateDisplay}
             </p>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-800 tracking-tight mt-0.5">
-              Olá, Dona Maria!
+              Olá, {user?.short_name || 'Dona Maria'}!
             </h1>
             <p className="text-sm sm:text-base text-slate-600 font-normal mt-1">
               Veja como está o seu dia.
@@ -123,7 +129,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Linha tricolor decorativa (Verde primary, Amarelo secondary e Azul de suporte) */}
+        {/* Linha tricolor decorativa */}
         <div className="flex h-1.5 w-28 rounded-full overflow-hidden mt-4 shadow-2xs">
           <span className="w-1/2 bg-primary"></span>
           <span className="w-1/4 bg-secondary"></span>
@@ -131,96 +137,136 @@ export default function Home() {
         </div>
       </section>
 
-      {/* TAREFA 2: Container com CSS Grid Responsivo (1 col no mobile, 3 cols no desktop) */}
+      {/* Grid Responsivo */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        {/* TAREFA 3: Coluna 1 (lg:col-span-2) contendo Secção A e Secção B */}
+        {/* Coluna 1 (lg:col-span-2): Medicamento e Acesso Rápido */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Secção A: Card "Próximo Medicamento" com degradê verde */}
-          <div className="w-full bg-gradient-to-r from-primary via-[#147e5d] to-[#1ca175] text-white rounded-3xl p-6 shadow-md relative overflow-hidden transition-all duration-300">
-            {/* Decoração sutil de fundo */}
-            <div className="absolute -right-8 -bottom-8 w-36 h-36 bg-white/10 rounded-full blur-xl pointer-events-none" />
+          {/* TAREFA 4: Card de Medicamento (Próximo) */}
+          {nextMed ? (
+            <div className="w-full bg-gradient-to-r from-primary via-[#147e5d] to-[#1ca175] text-white rounded-3xl p-6 shadow-md relative overflow-hidden transition-all duration-300">
+              <div className="absolute -right-8 -bottom-8 w-36 h-36 bg-white/10 rounded-full blur-xl pointer-events-none" />
 
-            <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
-              <div className="flex items-start gap-4">
-                <div className="p-3.5 bg-white/20 backdrop-blur-md rounded-2xl text-white shadow-inner shrink-0">
-                  <Pill className="w-7 h-7" />
-                </div>
-                <div>
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/20 text-xs font-semibold tracking-wide uppercase mb-1.5">
-                    <Clock className="w-3.5 h-3.5" />
-                    <span>Próximo Medicamento • 14:00</span>
+              <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
+                <div className="flex items-start gap-4">
+                  <div className="p-3.5 bg-white/20 backdrop-blur-md rounded-2xl text-white shadow-inner shrink-0">
+                    <Pill className="w-7 h-7" />
                   </div>
-                  <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-                    Losartana Potássica
-                  </h3>
-                  <p className="text-sm text-emerald-50/90 mt-0.5">
-                    50mg • 1 comprimido com água após o almoço
-                  </p>
+                  <div>
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/20 text-xs font-semibold tracking-wide uppercase mb-1.5">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>Próximo Medicamento • {nextMed.time}</span>
+                    </div>
+                    <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+                      {nextMed.name}
+                    </h3>
+                    <p className="text-sm text-emerald-50/90 mt-0.5">
+                      {nextMed.dosage}{' '}
+                      {nextMed.instructions ? `• ${nextMed.instructions}` : ''}
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              {/* Botão branco interativo */}
-              <button
-                type="button"
-                onClick={() => setMedTaken(!medTaken)}
-                className={`cursor-pointer whitespace-nowrap px-5 py-3 rounded-xl font-bold text-sm shadow-sm transition-all duration-200 flex items-center justify-center gap-2 self-start sm:self-center ${
-                  medTaken
-                    ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                    : 'bg-white text-primary hover:bg-slate-50 active:scale-95'
-                }`}
-                aria-label="Marcar medicamento como tomado"
-              >
-                <Check
-                  className={`w-4 h-4 transition-transform ${
-                    medTaken ? 'scale-125 stroke-[3]' : 'stroke-2'
+                {/* Botão marcar como tomado */}
+                <button
+                  type="button"
+                  onClick={() => setMedTaken(!medTaken)}
+                  className={`cursor-pointer whitespace-nowrap px-5 py-3 rounded-xl font-bold text-sm shadow-sm transition-all duration-200 flex items-center justify-center gap-2 self-start sm:self-center ${
+                    medTaken || nextMed.is_taken
+                      ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                      : 'bg-white text-primary hover:bg-slate-50 active:scale-95'
                   }`}
-                />
-                <span>{medTaken ? 'Dose tomada!' : 'Marcar como tomado'}</span>
-              </button>
+                  aria-label="Marcar medicamento como tomado"
+                >
+                  <Check
+                    className={`w-4 h-4 transition-transform ${
+                      medTaken || nextMed.is_taken ? 'scale-125 stroke-[3]' : 'stroke-2'
+                    }`}
+                  />
+                  <span>
+                    {medTaken || nextMed.is_taken
+                      ? 'Dose tomada!'
+                      : 'Marcar como tomado'}
+                  </span>
+                </button>
+              </div>
             </div>
-          </div>
+          ) : (
+            /* Mensagem se medications estiver vazio */
+            <div className="w-full bg-emerald-50/90 border border-emerald-200 rounded-3xl p-6 text-[#126E51] shadow-xs flex items-center gap-4">
+              <div className="p-3 bg-white rounded-2xl text-[#126E51] shadow-xs shrink-0">
+                <CheckCircle2 className="w-7 h-7 text-[#126E51]" />
+              </div>
+              <div>
+                <h3 className="text-base sm:text-lg font-bold text-slate-800">
+                  Tudo certo! Sem medicamentos pendentes.
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
+                  Todas as doses programadas para hoje já foram concluídas.
+                </p>
+              </div>
+            </div>
+          )}
 
-          {/* Secção B: "Acesso rápido" com grid de 4 cartões com bordas laterais */}
+          {/* TAREFA 4: Acesso Rápido (.map em tasks) */}
           <div className="space-y-3">
             <h2 className="text-lg font-bold text-slate-800 tracking-tight">
               Acesso rápido
             </h2>
 
-            <div className="grid grid-cols-2 gap-4">
-              {quickActions.map((action) => {
-                const IconComponent = action.icon;
-                return (
-                  <Link
-                    key={action.id}
-                    to={action.to}
-                    className={`bg-card rounded-2xl p-4 shadow-xs border border-slate-100 border-l-4 ${action.borderColor} hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between group`}
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <div
-                        className={`w-10 h-10 rounded-xl ${action.iconBg} flex items-center justify-center shrink-0 transition-transform group-hover:scale-105`}
-                      >
-                        <IconComponent className="w-5 h-5" />
+            {tasks && tasks.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {tasks.map((task) => {
+                  const IconComponent = getTaskIcon(task.category);
+                  const color = task.color_hex || '#126E51';
+
+                  return (
+                    <Link
+                      key={task.id}
+                      to="/saude"
+                      className="bg-card rounded-2xl p-4 shadow-xs border border-slate-100 border-l-4 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between group"
+                      style={{ borderLeftColor: color }}
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <div
+                          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105"
+                          style={{
+                            backgroundColor: `${color}18`,
+                            color: color,
+                          }}
+                        >
+                          <IconComponent className="w-5 h-5" />
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors" />
                       </div>
-                      <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors" />
-                    </div>
-                    <div>
-                      <h4 className="text-sm sm:text-base font-bold text-slate-800 group-hover:text-primary transition-colors">
-                        {action.title}
-                      </h4>
-                      <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">
-                        {action.subtitle}
-                      </p>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <h4 className="text-sm sm:text-base font-bold text-slate-800 group-hover:text-primary transition-colors">
+                            {task.title}
+                          </h4>
+                          {task.is_completed && (
+                            <span className="text-[10px] bg-emerald-100 text-[#126E51] px-1.5 py-0.5 rounded-full font-bold">
+                              Feito
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">
+                          {task.subtitle}
+                        </p>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-slate-500 bg-card rounded-2xl p-4 border border-slate-100">
+                Nenhuma tarefa pendente no momento.
+              </p>
+            )}
           </div>
         </div>
 
-        {/* TAREFA 4: Coluna 2 (lg:col-span-1) - Próximos compromissos */}
+        {/* Coluna 2 (lg:col-span-1): TAREFA 4 - Compromissos (.map em appointments) */}
         <div className="lg:col-span-1 space-y-3 h-full flex flex-col">
-          {/* Cabeçalho da coluna */}
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-slate-800 tracking-tight">
               Próximos compromissos
@@ -234,50 +280,63 @@ export default function Home() {
             </Link>
           </div>
 
-          {/* Card alto contendo a lista dos próximos 3 eventos */}
+          {/* Card alto da agenda */}
           <div className="bg-card rounded-3xl p-5 shadow-xs border border-slate-100 flex-1 flex flex-col justify-between space-y-4">
-            <div className="divide-y divide-slate-100">
-              {upcomingEvents.map((event, idx) => (
-                <div
-                  key={event.id}
-                  className={`flex items-start gap-3.5 ${
-                    idx === 0 ? 'pb-4' : idx === upcomingEvents.length - 1 ? 'pt-4' : 'py-4'
-                  }`}
-                >
-                  {/* Bloco lateral azul claro com o dia e mês */}
-                  <div className="bg-sky-100 text-sky-800 rounded-2xl w-14 h-14 flex flex-col items-center justify-center shrink-0 shadow-2xs">
-                    <span className="text-lg font-extrabold leading-none tracking-tight">
-                      {event.day}
-                    </span>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-sky-600 mt-0.5">
-                      {event.month}
-                    </span>
-                  </div>
-
-                  {/* Informações do compromisso */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-1">
-                      <h4 className="text-sm font-bold text-slate-800 truncate">
-                        {event.title}
-                      </h4>
-                      <span className="text-[10px] font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full shrink-0">
-                        {event.time}
+            {appointments && appointments.length > 0 ? (
+              <div className="divide-y divide-slate-100">
+                {appointments.map((apt, idx) => (
+                  <div
+                    key={apt.id || idx}
+                    className={`flex items-start gap-3.5 ${
+                      idx === 0
+                        ? 'pb-4'
+                        : idx === appointments.length - 1
+                          ? 'pt-4'
+                          : 'py-4'
+                    }`}
+                  >
+                    {/* Bloco lateral com day_number e day_of_week_short */}
+                    <div
+                      className="bg-sky-100 text-sky-800 rounded-2xl w-14 h-14 flex flex-col items-center justify-center shrink-0 shadow-2xs"
+                      style={
+                        apt.color_hex && apt.color_hex !== '#000080'
+                          ? { backgroundColor: `${apt.color_hex}18`, color: apt.color_hex }
+                          : undefined
+                      }
+                    >
+                      <span className="text-lg font-extrabold leading-none tracking-tight">
+                        {apt.day_number}
+                      </span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-sky-600 mt-0.5">
+                        {apt.day_of_week_short}
                       </span>
                     </div>
-                    <p className="text-xs font-medium text-slate-600 mt-0.5 truncate">
-                      {event.doctor}
-                    </p>
-                    <div className="flex items-center gap-1.5 mt-1 text-slate-400">
-                      <span className="text-[11px] text-slate-500 truncate">
-                        {event.location}
-                      </span>
+
+                    {/* Informações: time, title e médico/subtitle */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-1">
+                        <h4 className="text-sm font-bold text-slate-800 truncate">
+                          {apt.title}
+                        </h4>
+                        <span className="text-[10px] font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full shrink-0">
+                          {apt.time}
+                        </span>
+                      </div>
+                      <p className="text-xs font-medium text-slate-600 mt-0.5 truncate">
+                        {apt.subtitle}
+                      </p>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              /* Mensagem se appointments estiver vazio */
+              <div className="py-8 text-center text-slate-500 text-sm">
+                Nenhum compromisso agendado para os próximos dias.
+              </div>
+            )}
 
-            {/* Rodapé auxiliar do card da agenda para preenchimento harmônico */}
+            {/* Ação auxiliar no rodapé */}
             <div className="pt-2">
               <Link
                 to="/agenda"

@@ -1,19 +1,36 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Heart, Mail, Lock, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { Heart, Mail, Lock, Eye, EyeOff, ShieldCheck, AlertCircle } from 'lucide-react';
+import { login } from '../services/api';
 
 const CURRENT_YEAR = new Date().getFullYear();
 
 export default function Login() {
   const navigate = useNavigate();
+
+  // Tarefa 2: Estados para inputs funcionais, loading e erro
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
 
-  const handleSubmit = (e) => {
+  // Tarefa 2: Função handleLogin com fluxo completo de autenticação
+  const handleLogin = async (e) => {
     e.preventDefault();
-    // Ação: navegar para a rota "/home"
-    navigate('/home');
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      await login(email, password);
+      // Se sucesso, navegar para a rota "/home"
+      navigate('/home');
+    } catch (err) {
+      // Se erro, exibir a mensagem no alerta vermelho
+      setError(err.message || 'E-mail ou senha inválidos. Tente novamente.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -80,8 +97,19 @@ export default function Login() {
             </p>
           </div>
 
-          {/* Formulário com inputs de altura 56px e labels externas */}
-          <form onSubmit={handleSubmit} className="space-y-4 pt-1">
+          {/* Alerta de erro vermelho acima do formulário */}
+          {error && (
+            <div
+              role="alert"
+              className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm font-medium flex items-center gap-3 animate-in fade-in duration-200"
+            >
+              <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {/* Formulário com inputs funcionais de 56px de altura e labels externas */}
+          <form onSubmit={handleLogin} className="space-y-4 pt-1">
             {/* Campo E-mail */}
             <div>
               <label
@@ -101,7 +129,8 @@ export default function Login() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="exemplo@email.com"
-                  className="w-full h-14 pl-12 pr-4 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 text-base focus:bg-white focus:outline-none focus:border-[#126E51] focus:ring-2 focus:ring-[#126E51]/20 transition-all"
+                  disabled={isLoading}
+                  className="w-full h-14 pl-12 pr-4 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 text-base focus:bg-white focus:outline-none focus:border-[#126E51] focus:ring-2 focus:ring-[#126E51]/20 transition-all disabled:opacity-60"
                 />
               </div>
             </div>
@@ -125,7 +154,8 @@ export default function Login() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Digite sua senha"
-                  className="w-full h-14 pl-12 pr-12 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 text-base focus:bg-white focus:outline-none focus:border-[#126E51] focus:ring-2 focus:ring-[#126E51]/20 transition-all"
+                  disabled={isLoading}
+                  className="w-full h-14 pl-12 pr-12 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 text-base focus:bg-white focus:outline-none focus:border-[#126E51] focus:ring-2 focus:ring-[#126E51]/20 transition-all disabled:opacity-60"
                 />
                 <button
                   type="button"
@@ -156,12 +186,20 @@ export default function Login() {
               </a>
             </div>
 
-            {/* Botão Entrar */}
+            {/* Botão Entrar com loading indicator */}
             <button
               type="submit"
-              className="w-full h-14 bg-[#126E51] hover:bg-[#0F5C47] text-white font-bold text-base rounded-xl shadow-xs transition-all duration-200 active:scale-[0.99] cursor-pointer flex items-center justify-center mt-2"
+              disabled={isLoading}
+              className="w-full h-14 bg-[#126E51] hover:bg-[#0F5C47] text-white font-bold text-base rounded-xl shadow-xs transition-all duration-200 active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2 mt-2 disabled:opacity-75 disabled:cursor-not-allowed"
             >
-              Entrar
+              {isLoading ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>Entrando...</span>
+                </>
+              ) : (
+                <span>Entrar</span>
+              )}
             </button>
           </form>
 

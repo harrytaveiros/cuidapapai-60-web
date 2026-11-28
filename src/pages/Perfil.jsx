@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   User,
@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   Check,
 } from 'lucide-react';
+import { logout, getUser } from '../services/api';
 
 export default function Perfil() {
   const navigate = useNavigate();
@@ -34,13 +35,37 @@ export default function Perfil() {
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
+  // Proteção da página: se não houver token ou se a API retornar 401, força logout e redireciona
+  useEffect(() => {
+    async function checkAuth() {
+      try {
+        const userData = await getUser();
+        if (userData && userData.name) {
+          setDadosPessoais((prev) => ({
+            ...prev,
+            nome: userData.name || prev.nome,
+          }));
+        }
+      } catch (error) {
+        if (error.status === 401 || error.message?.includes('401')) {
+          logout();
+          navigate('/', { replace: true });
+        }
+      }
+    }
+
+    checkAuth();
+  }, [navigate]);
+
   const handleSalvar = (e) => {
     e.preventDefault();
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3000);
   };
 
+  // Tarefa 3: Chamar logout() da api e fazer navigate('/')
   const handleConfirmLogout = () => {
+    logout();
     setShowLogoutModal(false);
     navigate('/');
   };
